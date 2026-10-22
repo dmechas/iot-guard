@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+.pytest_cache/
+
+# Secrets and local config
+.env
+.env.*
+config.yaml
+certs/
+*.crt
+*.pem
+*.key
+
+# Runtime data (IEEE OUI cache)
+oui.csv
+oui.tmp
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/

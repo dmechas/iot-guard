@@ -1,0 +1,42 @@
+# iot-guard rules. First decisive match wins (see README / plan):
+# overrides > randomized MAC > class_id_allow > hostname_block > iot_vendors > ambiguous_vendors (+ class_id_iot signal)
+
+overrides:
+  # "aa:bb:cc:dd:ee:ff": {action: block, note: "Huawei SUN2000 inverter"}
+  # "aa:bb:cc:dd:ee:00": {action: allow, note: "ESP dev board that needs internet"}
+  # Temporary internet; reverts to normal classification after `until` (naive = local time):
+  # "aa:bb:cc:dd:ee:01": {action: allow, until: "2026-10-23T20:00:00+01:00", note: "firmware update"}
+
+# DHCP option 60 globs (fnmatch) that mean "general-purpose OS" -> allow
+class_id_allow: ["android-dhcp-*", "MSFT 5.0", "dhcpcd-*"]
+# Embedded DHCP clients: an IoT signal that only blocks when combined with an ambiguous vendor
+class_id_iot: ["udhcp*"]
+
+hostname_block:
+  - '^ESP[_-]'
+  - '(?i)^shelly'
+  - '(?i)^tasmota'
+  - '^SUN2000'
+  - '^wlan0$'
+  - '(?i)^tuya'
+  - '(?i)^roomba'
+  - '^net_[a-z0-9]+_'   # Midea / SmartHome AC modules
+
+iot_vendors:
+  - Espressif Inc.
+  - Tuya Smart Inc.
+  - Shelly Group SE
+  - Allterco Robotics LTD
+  - SONOFF TECHNOLOGIES CO.,LTD
+  - ITEAD INTELLIGENT SYSTEMS CO.LTD
+  - Lumi United Technology Co., Ltd
+  - GD Midea Air-Conditioning Equipment Co.,Ltd.
+
+ambiguous_vendors:
+  - Realtek Semiconductor Corp.
+  - MEDIATEK Corp.
+  - Huawei Technologies Co.,Ltd
+  - Xiaomi Communications Co Ltd
+  - Samsung Electronics Co.,Ltd
+  - Amazon Technologies Inc.
+  - Google, Inc.

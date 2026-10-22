@@ -1,0 +1,19 @@
+services:
+  iot-guard:
+    build: .
+    restart: unless-stopped
+    environment:
+      ROUTEROS_URL: https://192.168.88.1
+      ROUTEROS_USER: iot-guard
+      ROUTEROS_PASSWORD: ${ROUTEROS_PASSWORD:?set in .env}
+      ROUTEROS_CA_CERT: /certs/local-ca.pem   # export from the router: /certificate export-certificate local-ca
+      IOT_GUARD_CONFIG: /config/config.yaml
+      IOT_GUARD_OUI: /data/oui.csv
+    # Start with --dry-run; remove it to go live (plan step 6).
+    command: ["run", "--dry-run"]
+    volumes:
+      - ./config.yaml:/config/config.yaml:ro
+      - ./certs:/certs:ro
+      - oui-data:/data
+volumes:
+  oui-data:
