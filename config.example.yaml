@@ -26,16 +26,14 @@ hostname_block:
 iot_vendors:
   - Espressif Inc.
   - Tuya Smart Inc.
-  - Shelly Group SE
-  - Allterco Robotics LTD
-  - SONOFF TECHNOLOGIES CO.,LTD
-  - ITEAD INTELLIGENT SYSTEMS CO.LTD
+  - Shelly Europe LTD
+  # Sonoff/ITEAD and older Shelly devices have no OUI of their own: they use Espressif's
   - Lumi United Technology Co., Ltd
   - GD Midea Air-Conditioning Equipment Co.,Ltd.
 
 ambiguous_vendors:
   - Realtek Semiconductor Corp.
-  - MEDIATEK Corp.
+  - MediaTek Inc
   - Huawei Technologies Co.,Ltd
   - Xiaomi Communications Co Ltd
   - Samsung Electronics Co.,Ltd
