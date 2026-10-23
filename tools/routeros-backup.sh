@@ -69,7 +69,7 @@ mkdir -p "$DEST"
 
 echo "Reading router info..."
 # identity print wraps the name one character per line without a terminal, so read it with get
-ros ":put \"identity: [/system identity get name]\"; /system resource print; /system routerboard print" \
+ros ":local n [/system identity get name]; :put \"identity: \$n\"; /system resource print; /system routerboard print" \
   >"$DEST/router-info.txt"
 
 echo "Creating backup and export on $ROUTER..."
