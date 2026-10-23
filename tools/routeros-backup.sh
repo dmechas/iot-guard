@@ -68,7 +68,9 @@ umask 077
 mkdir -p "$DEST"
 
 echo "Reading router info..."
-ros "/system identity print; /system resource print; /system routerboard print" >"$DEST/router-info.txt"
+# identity print wraps the name one character per line without a terminal, so read it with get
+ros ":put \"identity: [/system identity get name]\"; /system resource print; /system routerboard print" \
+  >"$DEST/router-info.txt"
 
 echo "Creating backup and export on $ROUTER..."
 created_on_router=true
