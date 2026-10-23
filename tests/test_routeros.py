@@ -64,6 +64,7 @@ def test_drop_connections_only_for_exact_source_ip():
 
     def h(req):
         if req.method == "GET":
+            assert req.url.params[".proplist"] == ".id,src-address"
             return httpx.Response(200, json=[
                 {".id": "*1", "src-address": "192.168.88.8:5000"},
                 {".id": "*2", "src-address": "192.168.88.80:5000"},  # prefix trap
@@ -106,3 +107,17 @@ def test_ipv6_loopback_and_ula_are_not_internet():
         return httpx.Response(200, json=[])
 
     assert make(h).ipv6_internet_problems() == []
+
+
+def test_drop_connections_tolerates_connection_already_gone():
+    def h(req):
+        if req.method == "GET":
+            return httpx.Response(200, json=[
+                {".id": "*1", "src-address": "192.168.88.8:5000"},
+                {".id": "*2", "src-address": "192.168.88.8:6000"},
+            ])
+        if req.url.path.endswith("*1"):
+            return httpx.Response(404, json={"error": 404, "message": "Not Found"})
+        return httpx.Response(204)
+
+    assert make(h).drop_connections("192.168.88.8") == 1

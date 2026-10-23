@@ -8,7 +8,8 @@ overrides:
   # "aa:bb:cc:dd:ee:01": {action: allow, until: "2026-10-23T20:00:00+01:00", note: "firmware update"}
 
 # DHCP option 60 globs (fnmatch) that mean "general-purpose OS" -> allow
-class_id_allow: ["android-dhcp-*", "MSFT 5.0", "dhcpcd-*"]
+# (dhcpcd-* is deliberately absent: many Linux-based IoT devices use dhcpcd too)
+class_id_allow: ["android-dhcp-*", "MSFT 5.0"]
 # Embedded DHCP clients: an IoT signal that only blocks when combined with an ambiguous vendor
 class_id_iot: ["udhcp*"]
 

@@ -26,7 +26,8 @@ simply not classified until it is back. When a device becomes blocked, its open
 connections are dropped.
 
 Known limits: the OUI only identifies the NIC vendor, randomized MACs carry no vendor,
-and MAC spoofing defeats any MAC-based scheme. Fix misses with overrides. Devices keep
+and MAC spoofing defeats any MAC-based scheme, as does a device taking over another
+leased device's IP. Fix misses with overrides. Devices keep
 LAN access to each other; real isolation would need VLAN-capable APs.
 
 ## Router setup (one time)
@@ -49,6 +50,28 @@ Replace `<SERVER_IP>` with the machine running iot-guard.
 
 - The `iot-guard` drop rule must sit **above** the fasttrack rule, or fasttracked
   connections bypass it.
+
+### No internet without a DHCP lease
+
+The block works by IP, so a device that sets its own IP would never be blocked. This rule
+gives WAN access only to IPs that hold a DHCP lease. It assumes **no device on the LAN
+uses a fixed IP** (true as of 2026-10-22); give any future fixed-IP machine a static DHCP
+lease instead.
+
+```
+/ip dhcp-server set [find] address-lists=dhcp-leased
+```
+
+**Before adding the rule**, check that `/ip firewall address-list print where list=dhcp-leased`
+has one dynamic entry per bound lease (`/ip dhcp-server lease print where status=bound`).
+Entries may only appear as leases renew. Adding the rule while the list is incomplete cuts
+those devices off.
+
+```
+/ip firewall filter add chain=forward src-address=192.168.88.0/24 src-address-list=!dhcp-leased out-interface-list=WAN action=drop comment="iot-guard: no DHCP lease" place-before=[find where comment="iot-guard"]
+```
+
+Emergency off switch: `/ip firewall filter disable [find where comment="iot-guard: no DHCP lease"]`.
 - Export the CA for the service: `/certificate export-certificate local-ca`, then copy
   `cert_export_local-ca.crt` to `certs/local-ca.pem`.
 - `ROUTEROS_URL` must use the IP in the certificate (`https://192.168.88.1`), not a hostname.
@@ -58,13 +81,17 @@ Replace `<SERVER_IP>` with the machine running iot-guard.
 
 Copy `config.example.yaml` to `config.yaml` (git-ignored) and edit. All rule lists live
 there, so no code changes are needed. **The file is read at startup: restart after editing.**
+The service refuses to start on a config mistake (unknown key, malformed MAC, bad regex,
+`until` without a time) rather than silently ignoring it.
 
 Environment variables:
 
 | Variable | Meaning |
 | --- | --- |
 | `ROUTEROS_URL` | e.g. `https://192.168.88.1` |
-| `ROUTEROS_USER` / `ROUTEROS_PASSWORD` | the `iot-guard` router user |
+| `ROUTEROS_USER` | the `iot-guard` router user |
+| `ROUTEROS_PASSWORD_FILE` | file containing the password (preferred; used by compose) |
+| `ROUTEROS_PASSWORD` | the password itself, if no file is given (handy locally) |
 | `ROUTEROS_CA_CERT` | path to the exported CA certificate |
 | `IOT_GUARD_CONFIG` | config path (default `config.yaml`) |
 | `IOT_GUARD_OUI` | where to cache the IEEE OUI list (default `/data/oui.csv`) |
@@ -79,8 +106,8 @@ overrides:
   "A8:00:00:00:00:04": {action: allow, until: "2026-10-23T20:00:00+01:00", note: "Shelly fw update"}
 ```
 
-- `until` is only valid with `allow`. Use an explicit UTC offset: a time without one is
-  read in the container's timezone, which is UTC by default.
+- `until` is only valid with `allow` and needs a date **and** time. Use an explicit UTC
+  offset: a time without one is read in the container's timezone, which is UTC by default.
 - After `until`, the device falls back to normal classification and is blocked again
   within one poll, with its open connections dropped.
 - A `block` override for a device with a static DHCP lease stays in force while the device
@@ -91,6 +118,9 @@ overrides:
 Run and look for `UNCLASSIFIED` lines. Add an override for a single device, or extend
 `hostname_block` / `iot_vendors` for a class of devices. Vendor names are matched
 case-insensitively but must otherwise equal the IEEE registry name.
+
+`class_id_allow` beats hostname and vendor rules, so keep it narrow. `dhcpcd-*` is left
+out on purpose: many Linux-based IoT devices use dhcpcd as well.
 
 ## Running
 
@@ -108,14 +138,23 @@ export ROUTEROS_URL=https://192.168.88.1 ROUTEROS_USER=iot-guard \
 
 Docker, on the server:
 
-1. Put `config.yaml`, `certs/local-ca.pem` and a `.env` containing `ROUTEROS_PASSWORD=…`
-   next to `compose.yaml`.
+1. Next to `compose.yaml`, put `config.yaml`, `certs/local-ca.pem`, and the router
+   password on one line in `secrets/routeros_password`. The container runs as uid 10001
+   and must be able to read it:
+   `sudo chown 10001 secrets/routeros_password && sudo chmod 400 secrets/routeros_password`
 2. `compose.yaml` starts with `--dry-run`. Review the logs for a while, then change
    `command` to `["run"]`.
 3. `docker compose up -d`. The container restarts with `unless-stopped`.
 
-Logs go to stdout. At startup the service warns if the router has a global IPv6 address
-or a `::/0` route, because the drop rule is IPv4-only.
+The container runs read-only, as a non-root user, with all capabilities dropped.
+Logs go to stdout (rotated by Docker). At startup the service warns if the router has a
+global IPv6 address or a `::/0` route, because the drop rule is IPv4-only.
+
+Failure behaviour: if the router is unreachable, the service logs an error and retries
+every poll. If the router returns no DHCP leases at all, it changes nothing, so a DHCP
+restart can't unblock everything. One failed router operation doesn't stop the others,
+and connection drops that fail are retried on the next poll. A bad OUI download is
+rejected and the cached copy kept.
 
 ## Verifying on the router
 
@@ -131,6 +170,14 @@ Stopping the container leaves the entries in place. Restarting must not create d
 
 ```
 .venv/bin/pytest
+```
+
+The image installs dependencies only from the hash-locked `requirements.lock` and the base
+image is pinned by digest. To upgrade, change the ranges in `pyproject.toml`, then:
+
+```
+uv pip compile pyproject.toml --generate-hashes --universal --python-version 3.12 -o requirements.lock
+docker buildx imagetools inspect python:3.12-slim   # new digest for the Dockerfile
 ```
 
 - `classifier.py`: pure classification

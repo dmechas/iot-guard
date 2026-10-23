@@ -73,9 +73,14 @@ class RouterOS:
     def drop_connections(self, address: str) -> int:
         """Remove tracked connections originating from exactly `address`."""
         n = 0
-        for row in self._get(CONN_PATH):
+        # src-address includes the port and the REST query syntax has no prefix match,
+        # so filter locally but only fetch the two columns we need.
+        for row in self._get(CONN_PATH, **{".proplist": ".id,src-address"}):
             if row.get("src-address", "").rsplit(":", 1)[0] == address:
-                self._http.delete(f"{CONN_PATH}/{row['.id']}").raise_for_status()
+                r = self._http.delete(f"{CONN_PATH}/{row['.id']}")
+                if r.status_code == 404:
+                    continue  # connection closed between listing and delete
+                r.raise_for_status()
                 n += 1
         return n
 
