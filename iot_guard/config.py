@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+import logging
+import os
 import re
 from dataclasses import dataclass, field
 from datetime import datetime
+
+
+log = logging.getLogger("iot_guard.config")
 
 
 def normalize_mac(mac: str) -> str:
@@ -89,3 +94,35 @@ def load_config(path) -> Rules:
         except re.error as e:
             raise ValueError(f"invalid hostname_block regex {pattern!r}: {e}") from e
     return Rules(overrides=overrides, **lists)
+
+
+class ConfigWatcher:
+    """Reloads the config whenever the file changes. The initial load must succeed; after that a
+    broken or missing file keeps the last good rules, so a typo can never unblock devices."""
+
+    def __init__(self, path):
+        self._path = path
+        self._version = self._stat()
+        self._rules = load_config(path)
+        self._bad_version = None
+
+    def _stat(self):
+        try:
+            st = os.stat(self._path)
+        except FileNotFoundError:
+            return None
+        return (st.st_ino, st.st_size, st.st_mtime_ns)
+
+    def rules(self) -> Rules:
+        version = self._stat()
+        if version == self._version or version == self._bad_version:
+            return self._rules
+        try:
+            rules = load_config(self._path)
+        except Exception as e:
+            self._bad_version = version
+            log.error("config %s invalid, keeping previous rules: %s", self._path, e)
+            return self._rules
+        self._rules, self._version, self._bad_version = rules, version, None
+        log.info("config %s reloaded", self._path)
+        return rules

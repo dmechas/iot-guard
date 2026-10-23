@@ -80,9 +80,14 @@ Emergency off switch: `/ip firewall filter disable [find where comment="iot-guar
 ## Configuration
 
 Copy `config.example.yaml` to `config.yaml` (git-ignored) and edit. All rule lists live
-there, so no code changes are needed. **The file is read at startup: restart after editing.**
+there, so no code changes are needed. **Edits are picked up on the next poll (≤ 30 s), no
+restart needed.** The log shows `config … reloaded`.
+
 The service refuses to start on a config mistake (unknown key, malformed MAC, bad regex,
-`until` without a time) rather than silently ignoring it.
+`until` without a time) rather than silently ignoring it. A mistake made while it is running
+is logged once as `config … invalid, keeping previous rules`, and the last good rules stay
+in force until the file is fixed, so a typo can never unblock devices. The same applies if the
+file is deleted.
 
 Environment variables:
 
@@ -138,7 +143,7 @@ export ROUTEROS_URL=https://192.168.88.1 ROUTEROS_USER=iot-guard \
 
 Docker, on the server:
 
-1. Next to `compose.yaml`, put `config.yaml`, `certs/local-ca.pem`, and the router
+1. Next to `compose.yaml`, put `config/config.yaml`, `certs/local-ca.pem`, and the router
    password on one line in `secrets/routeros_password`. The container runs as uid 10001
    and must be able to read it:
    `sudo chown 10001 secrets/routeros_password && sudo chmod 400 secrets/routeros_password`

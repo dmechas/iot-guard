@@ -129,3 +129,55 @@ def test_load_config_rejects_mistakes(tmp_path, yaml_text, msg):
     p.write_text(yaml_text)
     with pytest.raises(ValueError, match=msg):
         load_config(p)
+
+
+def _write(p, text, mtime):
+    p.write_text(text)
+    os.utime(p, (mtime, mtime))  # explicit, so tests don't depend on mtime resolution
+
+
+def test_config_watcher_picks_up_edits(tmp_path):
+    from iot_guard.config import ConfigWatcher
+
+    p = tmp_path / "c.yaml"
+    _write(p, "iot_vendors: [A]\n", 1000)
+    w = ConfigWatcher(p)
+    assert w.rules().iot_vendors == ["A"]
+    _write(p, "iot_vendors: [B]\n", 2000)
+    assert w.rules().iot_vendors == ["B"]
+
+
+def test_config_watcher_keeps_last_good_rules_on_bad_edit(tmp_path, caplog):
+    import logging
+
+    from iot_guard.config import ConfigWatcher
+
+    p = tmp_path / "c.yaml"
+    _write(p, "iot_vendors: [A]\n", 1000)
+    w = ConfigWatcher(p)
+    _write(p, "iot_vendorz: [B]\n", 2000)
+    with caplog.at_level(logging.ERROR):
+        assert w.rules().iot_vendors == ["A"]
+        assert w.rules().iot_vendors == ["A"]
+    assert sum("keeping previous" in m for m in caplog.messages) == 1  # logged once per bad version
+    _write(p, "iot_vendors: [C]\n", 3000)
+    assert w.rules().iot_vendors == ["C"]
+
+
+def test_config_watcher_keeps_rules_if_file_disappears(tmp_path):
+    from iot_guard.config import ConfigWatcher
+
+    p = tmp_path / "c.yaml"
+    _write(p, "iot_vendors: [A]\n", 1000)
+    w = ConfigWatcher(p)
+    p.unlink()
+    assert w.rules().iot_vendors == ["A"]
+
+
+def test_config_watcher_fails_fast_on_bad_initial_config(tmp_path):
+    from iot_guard.config import ConfigWatcher
+
+    p = tmp_path / "c.yaml"
+    _write(p, "nope: 1\n", 1000)
+    with pytest.raises(ValueError):
+        ConfigWatcher(p)

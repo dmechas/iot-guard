@@ -14,7 +14,9 @@ services:
     secrets:
       - routeros_password
     volumes:
-      - ./config.yaml:/config/config.yaml:ro
+      # Mount the directory, not the file: editors save by replacing the file, and a
+      # single-file bind mount would keep showing the old one, so reloads would never happen.
+      - ./config:/config:ro
       - ./certs:/certs:ro
       - oui-data:/data
     read_only: true

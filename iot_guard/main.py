@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 import httpx
 
 from .classifier import classify
-from .config import Rules, load_config, normalize_mac
+from .config import ConfigWatcher, Rules, normalize_mac
 from .oui import refresh
 from .reconciler import make_comment, reconcile
 from .routeros import RouterOS
@@ -140,7 +140,7 @@ def cli(argv=None) -> int:
             print(l.mac, l.address, l.host_name or "-", l.class_id or "-", oui.vendor(l.mac) or "-", "" if l.active else "(offline)")
         return 0
 
-    rules = load_config(args.config)
+    config = ConfigWatcher(args.config)
     oui = refresh(args.oui_file)
     state = State()
     ipv6_checked = False
@@ -148,7 +148,7 @@ def cli(argv=None) -> int:
     while True:
         ipv6_checked = ipv6_checked or _check_ipv6(router)
         try:
-            run_once(router, oui, rules, LIST_NAME, dry_run=args.dry_run, state=state)
+            run_once(router, oui, config.rules(), LIST_NAME, dry_run=args.dry_run, state=state)
         except (httpx.HTTPError, OSError) as e:
             log.error("iteration failed, entries on the router are left as-is: %s", e)
         except Exception:
