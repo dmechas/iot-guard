@@ -1,5 +1,9 @@
 services:
   iot-guard:
+    # Built by .github/workflows/image.yml. On the Pi (no repo checkout):
+    #   docker compose pull && docker compose up -d --no-build
+    # Locally, `docker compose up -d --build` builds from source instead.
+    image: ghcr.io/dmechas/iot-guard:main
     build: .
     restart: unless-stopped
     environment:

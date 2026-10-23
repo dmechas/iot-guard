@@ -141,15 +141,27 @@ export ROUTEROS_URL=https://192.168.88.1 ROUTEROS_USER=iot-guard \
 .venv/bin/iot-guard run --once --config config.yaml               # apply once
 ```
 
-Docker, on the server:
+Docker, on the Raspberry Pi (arm64). The repo is not cloned there: GitHub Actions
+(`.github/workflows/image.yml`) tests and builds the image on every push to `main` and
+publishes it as `ghcr.io/dmechas/iot-guard:main` and `:sha-<commit>`.
 
-1. Next to `compose.yaml`, put `config/config.yaml`, `certs/local-ca.pem`, and the router
-   password on one line in `secrets/routeros_password`. The container runs as uid 10001
-   and must be able to read it:
+1. The package is private. Log in once with a classic personal access token that has only
+   the `read:packages` scope:
+   `echo <token> | docker login ghcr.io -u dmechas --password-stdin`
+2. Create a folder with just `compose.yaml` (copied from the repo), `config/config.yaml`,
+   `certs/local-ca.pem`, and the router password on one line in
+   `secrets/routeros_password`. The container runs as uid 10001 and must be able to read it:
    `sudo chown 10001 secrets/routeros_password && sudo chmod 400 secrets/routeros_password`
-2. `compose.yaml` starts with `--dry-run`. Review the logs for a while, then change
+3. `compose.yaml` starts with `--dry-run`. Review the logs for a while, then change
    `command` to `["run"]`.
-3. `docker compose up -d`. The container restarts with `unless-stopped`.
+4. `docker compose pull && docker compose up -d --no-build`. The container restarts with
+   `unless-stopped`.
+
+To update after a push: wait for the workflow to finish, then repeat step 4. To pin or roll
+back, change the tag to `:sha-<commit>`. There are deliberately no automatic updates, so a
+bad build never reaches the firewall unattended.
+
+Locally, `docker compose up -d --build` builds from source instead of pulling.
 
 The container runs read-only, as a non-root user, with all capabilities dropped.
 Logs go to stdout (rotated by Docker). At startup the service warns if the router has a
