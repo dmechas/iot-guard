@@ -11,6 +11,8 @@ dist/
 .env
 .env.*
 config.yaml
+config.yaml.*
+*.bak
 config/
 certs/
 *.crt
@@ -27,3 +29,8 @@ oui.tmp
 .vscode/
 secrets/
 routeros-backups/
+
+# Personal local files (the handoff notes contain real device identifiers)
+.envrc
+iot-guard-handoff.md
+script/
